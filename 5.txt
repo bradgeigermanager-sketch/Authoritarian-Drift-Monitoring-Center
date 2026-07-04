@@ -1,0 +1,534 @@
+Here’s a **concise, implementation‑ready renderer** for each stack—React, Vue, and Svelte—built around the compiled schema model (`compileSchemas()` returning an array of `{ title, description, fields }`).
+
+I’ll assume the compiled schema shape:
+
+```ts
+type CompiledField =
+  | {
+      name: string;
+      label: string;
+      type: "text" | "number" | "slider";
+      min?: number;
+      max?: number;
+      step?: number;
+    }
+  | {
+      name: string;
+      label: string;
+      type: "radio";
+      options: { value: string; label: string }[];
+    }
+  | {
+      name: string;
+      label: string;
+      type: "select";
+      options: { value: string; label: string }[];
+    }
+  | {
+      name: string;
+      label: string;
+      type: "checklist";
+      items: string[];
+    };
+
+type CompiledSchema = {
+  title: string;
+  description?: string;
+  fields: CompiledField[];
+};
+```
+
+---
+
+### React renderer (TypeScript, functional)
+
+```tsx
+// DriftForm.tsx
+import React, { useEffect, useState } from "react";
+import { compileSchemas } from "./schema-compiler";
+
+type CompiledField = any;
+type CompiledSchema = { title: string; description?: string; fields: CompiledField[] };
+
+export const DriftForm: React.FC = () => {
+  const [schemas, setSchemas] = useState<CompiledSchema[]>([]);
+  const [values, setValues] = useState<Record<string, any>>({});
+  const [adrs, setAdrs] = useState<number | null>(null);
+
+  useEffect(() => {
+    compileSchemas().then(setSchemas);
+  }, []);
+
+  function updateValue(name: string, value: any) {
+    setValues(prev => {
+      const next = { ...prev, [name]: value };
+      computeADRS(next);
+      return next;
+    });
+  }
+
+  function computeADRS(payload: Record<string, any>) {
+    const S = Number(payload.S || 0);
+    const P = Number(payload.P || 0);
+    const E = Number(payload.E || 0);
+    const O = Number(payload.O || 0);
+    const R = Number(payload.R || 0);
+    const score = 0.2 * S + 0.2 * P + 0.2 * E + 0.25 * O + 0.15 * R;
+    setAdrs(score * 10);
+  }
+
+  function renderField(field: CompiledField) {
+    const commonLabel = <label>{field.label}</label>;
+
+    switch (field.type) {
+      case "text":
+        return (
+          <div className="field-block" key={field.name}>
+            {commonLabel}
+            <input
+              type="text"
+              name={field.name}
+              value={values[field.name] || ""}
+              onChange={e => updateValue(field.name, e.target.value)}
+            />
+          </div>
+        );
+      case "number":
+        return (
+          <div className="field-block" key={field.name}>
+            {commonLabel}
+            <input
+              type="number"
+              name={field.name}
+              min={field.min}
+              max={field.max}
+              value={values[field.name] ?? ""}
+              onChange={e => updateValue(field.name, Number(e.target.value || 0))}
+            />
+          </div>
+        );
+      case "slider":
+        return (
+          <div className="field-block" key={field.name}>
+            {commonLabel}
+            <input
+              type="range"
+              name={field.name}
+              min={field.min}
+              max={field.max}
+              step={field.step || 1}
+              value={values[field.name] ?? 0}
+              onChange={e => updateValue(field.name, Number(e.target.value || 0))}
+            />
+          </div>
+        );
+      case "radio":
+        return (
+          <div className="field-block" key={field.name}>
+            {commonLabel}
+            {field.options.map((opt: any) => (
+              <div key={opt.value}>
+                <input
+                  type="radio"
+                  name={field.name}
+                  value={opt.value}
+                  checked={values[field.name] === opt.value}
+                  onChange={e => updateValue(field.name, e.target.value)}
+                />
+                <span>{opt.label}</span>
+              </div>
+            ))}
+          </div>
+        );
+      case "select":
+        return (
+          <div className="field-block" key={field.name}>
+            {commonLabel}
+            <select
+              name={field.name}
+              value={values[field.name] || ""}
+              onChange={e => updateValue(field.name, e.target.value)}
+            >
+              <option value="">Select…</option>
+              {field.options.map((opt: any) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        );
+      case "checklist":
+        return (
+          <div className="field-block" key={field.name}>
+            {commonLabel}
+            {field.items.map((item: string) => {
+              const current = values[field.name] || [];
+              const checked = current.includes(item);
+              return (
+                <div key={item}>
+                  <input
+                    type="checkbox"
+                    name={field.name}
+                    value={item}
+                    checked={checked}
+                    onChange={e => {
+                      const prev = values[field.name] || [];
+                      const next = e.target.checked
+                        ? [...prev, item]
+                        : prev.filter((x: string) => x !== item);
+                      updateValue(field.name, next);
+                    }}
+                  />
+                  <span>{item}</span>
+                </div>
+              );
+            })}
+          </div>
+        );
+      default:
+        return null;
+    }
+  }
+
+  function handleSubmit() {
+    const payload = {
+      ...values,
+      timestamp: new Date().toISOString(),
+      ADRS100: adrs
+    };
+    window.parent.postMessage({ type: "ADRS_SUBMIT", payload }, "*");
+  }
+
+  return (
+    <div>
+      <h2>Authoritarian Drift Input (React)</h2>
+      {schemas.map(schema => (
+        <section key={schema.title}>
+          <h3>{schema.title}</h3>
+          {schema.description && <p>{schema.description}</p>}
+          {schema.fields.map(renderField)}
+        </section>
+      ))}
+      <div id="scoreBox">ADRS: {adrs != null ? Math.round(adrs) : "n/a"}</div>
+      <button type="button" onClick={handleSubmit}>
+        Submit
+      </button>
+    </div>
+  );
+};
+```
+
+---
+
+### Vue renderer (Vue 3, Composition API)
+
+```ts
+// DriftForm.vue
+<script setup lang="ts">
+import { ref, onMounted } from "vue";
+import { compileSchemas } from "./schema-compiler";
+
+type CompiledField = any;
+type CompiledSchema = { title: string; description?: string; fields: CompiledField[] };
+
+const schemas = ref<CompiledSchema[]>([]);
+const values = ref<Record<string, any>>({});
+const adrs = ref<number | null>(null);
+
+onMounted(async () => {
+  schemas.value = await compileSchemas();
+});
+
+function updateValue(name: string, value: any) {
+  values.value = { ...values.value, [name]: value };
+  computeADRS(values.value);
+}
+
+function computeADRS(payload: Record<string, any>) {
+  const S = Number(payload.S || 0);
+  const P = Number(payload.P || 0);
+  const E = Number(payload.E || 0);
+  const O = Number(payload.O || 0);
+  const R = Number(payload.R || 0);
+  const score = 0.2 * S + 0.2 * P + 0.2 * E + 0.25 * O + 0.15 * R;
+  adrs.value = score * 10;
+}
+
+function handleSubmit() {
+  const payload = {
+    ...values.value,
+    timestamp: new Date().toISOString(),
+    ADRS100: adrs.value
+  };
+  window.parent.postMessage({ type: "ADRS_SUBMIT", payload }, "*");
+}
+</script>
+
+<template>
+  <div>
+    <h2>Authoritarian Drift Input (Vue)</h2>
+
+    <section v-for="schema in schemas" :key="schema.title">
+      <h3>{{ schema.title }}</h3>
+      <p v-if="schema.description">{{ schema.description }}</p>
+
+      <div
+        v-for="field in schema.fields"
+        :key="field.name"
+        class="field-block"
+      >
+        <label>{{ field.label }}</label>
+
+        <!-- text -->
+        <input
+          v-if="field.type === 'text'"
+          type="text"
+          :name="field.name"
+          :value="values[field.name] || ''"
+          @input="updateValue(field.name, ($event.target as HTMLInputElement).value)"
+        />
+
+        <!-- number -->
+        <input
+          v-else-if="field.type === 'number'"
+          type="number"
+          :name="field.name"
+          :min="field.min"
+          :max="field.max"
+          :value="values[field.name] ?? ''"
+          @input="updateValue(field.name, Number(($event.target as HTMLInputElement).value || 0))"
+        />
+
+        <!-- slider -->
+        <input
+          v-else-if="field.type === 'slider'"
+          type="range"
+          :name="field.name"
+          :min="field.min"
+          :max="field.max"
+          :step="field.step || 1"
+          :value="values[field.name] ?? 0"
+          @input="updateValue(field.name, Number(($event.target as HTMLInputElement).value || 0))"
+        />
+
+        <!-- radio -->
+        <div v-else-if="field.type === 'radio'">
+          <div v-for="opt in field.options" :key="opt.value">
+            <input
+              type="radio"
+              :name="field.name"
+              :value="opt.value"
+              :checked="values[field.name] === opt.value"
+              @change="updateValue(field.name, opt.value)"
+            />
+            <span>{{ opt.label }}</span>
+          </div>
+        </div>
+
+        <!-- select -->
+        <select
+          v-else-if="field.type === 'select'"
+          :name="field.name"
+          :value="values[field.name] || ''"
+          @change="updateValue(field.name, ($event.target as HTMLSelectElement).value)"
+        >
+          <option value="">Select…</option>
+          <option
+            v-for="opt in field.options"
+            :key="opt.value"
+            :value="opt.value"
+          >
+            {{ opt.label }}
+          </option>
+        </select>
+
+        <!-- checklist -->
+        <div v-else-if="field.type === 'checklist'">
+          <div v-for="item in field.items" :key="item">
+            <input
+              type="checkbox"
+              :name="field.name"
+              :value="item"
+              :checked="(values[field.name] || []).includes(item)"
+              @change="(e) => {
+                const prev = values[field.name] || [];
+                const checked = (e.target as HTMLInputElement).checked;
+                const next = checked
+                  ? [...prev, item]
+                  : prev.filter((x: string) => x !== item);
+                updateValue(field.name, next);
+              }"
+            />
+            <span>{{ item }}</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div id="scoreBox">ADRS: {{ adrs != null ? Math.round(adrs) : 'n/a' }}</div>
+    <button type="button" @click="handleSubmit">Submit</button>
+  </div>
+</template>
+
+<style scoped>
+.field-block {
+  margin-bottom: 8px;
+}
+</style>
+```
+
+---
+
+### Svelte renderer
+
+```svelte
+<!-- DriftForm.svelte -->
+<script lang="ts">
+  import { onMount } from "svelte";
+  import { compileSchemas } from "./schema-compiler";
+
+  type CompiledField = any;
+  type CompiledSchema = { title: string; description?: string; fields: CompiledField[] };
+
+  let schemas: CompiledSchema[] = [];
+  let values: Record<string, any> = {};
+  let adrs: number | null = null;
+
+  onMount(async () => {
+    schemas = await compileSchemas();
+  });
+
+  function updateValue(name: string, value: any) {
+    values = { ...values, [name]: value };
+    computeADRS(values);
+  }
+
+  function computeADRS(payload: Record<string, any>) {
+    const S = Number(payload.S || 0);
+    const P = Number(payload.P || 0);
+    const E = Number(payload.E || 0);
+    const O = Number(payload.O || 0);
+    const R = Number(payload.R || 0);
+    const score = 0.2 * S + 0.2 * P + 0.2 * E + 0.25 * O + 0.15 * R;
+    adrs = score * 10;
+  }
+
+  function handleSubmit() {
+    const payload = {
+      ...values,
+      timestamp: new Date().toISOString(),
+      ADRS100: adrs
+    };
+    window.parent.postMessage({ type: "ADRS_SUBMIT", payload }, "*");
+  }
+</script>
+
+<div>
+  <h2>Authoritarian Drift Input (Svelte)</h2>
+
+  {#each schemas as schema (schema.title)}
+    <section>
+      <h3>{schema.title}</h3>
+      {#if schema.description}
+        <p>{schema.description}</p>
+      {/if}
+
+      {#each schema.fields as field (field.name)}
+        <div class="field-block">
+          <label>{field.label}</label>
+
+          {#if field.type === "text"}
+            <input
+              type="text"
+              name={field.name}
+              value={values[field.name] || ""}
+              on:input={(e) => updateValue(field.name, (e.target as HTMLInputElement).value)}
+            />
+          {:else if field.type === "number"}
+            <input
+              type="number"
+              name={field.name}
+              min={field.min}
+              max={field.max}
+              value={values[field.name] ?? ""}
+              on:input={(e) => updateValue(field.name, Number((e.target as HTMLInputElement).value || 0))}
+            />
+          {:else if field.type === "slider"}
+            <input
+              type="range"
+              name={field.name}
+              min={field.min}
+              max={field.max}
+              step={field.step || 1}
+              value={values[field.name] ?? 0}
+              on:input={(e) => updateValue(field.name, Number((e.target as HTMLInputElement).value || 0))}
+            />
+          {:else if field.type === "radio"}
+            <div>
+              {#each field.options as opt (opt.value)}
+                <div>
+                  <input
+                    type="radio"
+                    name={field.name}
+                    value={opt.value}
+                    checked={values[field.name] === opt.value}
+                    on:change={() => updateValue(field.name, opt.value)}
+                  />
+                  <span>{opt.label}</span>
+                </div>
+              {/each}
+            </div>
+          {:else if field.type === "select"}
+            <select
+              name={field.name}
+              value={values[field.name] || ""}
+              on:change={(e) => updateValue(field.name, (e.target as HTMLSelectElement).value)}
+            >
+              <option value="">Select…</option>
+              {#each field.options as opt (opt.value)}
+                <option value={opt.value}>{opt.label}</option>
+              {/each}
+            </select>
+          {:else if field.type === "checklist"}
+            <div>
+              {#each field.items as item (item)}
+                <div>
+                  <input
+                    type="checkbox"
+                    name={field.name}
+                    value={item}
+                    checked={(values[field.name] || []).includes(item)}
+                    on:change={(e) => {
+                      const prev = values[field.name] || [];
+                      const checked = (e.target as HTMLInputElement).checked;
+                      const next = checked
+                        ? [...prev, item]
+                        : prev.filter((x: string) => x !== item);
+                      updateValue(field.name, next);
+                    }}
+                  />
+                  <span>{item}</span>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/each}
+    </section>
+  {/each}
+
+  <div id="scoreBox">ADRS: {adrs != null ? Math.round(adrs) : "n/a"}</div>
+  <button type="button" on:click={handleSubmit}>Submit</button>
+</div>
+
+<style>
+  .field-block {
+    margin-bottom: 8px;
+  }
+</style>
+```
+
+---
+
+You can plug any of these into your AOS workspace as the **drift input panel**, wired to the schema auto‑compiler and ADRS scoring.
