@@ -1,0 +1,299 @@
+
+# **📁 structural.json**
+```json
+{
+  "title": "Structural Drift",
+  "description": "Evaluates expansion of political sensitivity zones, vague statutes, and structural centralization.",
+  "fields": [
+    {
+      "name": "S",
+      "label": "Structural drift score",
+      "type": "slider",
+      "min": 0,
+      "max": 10,
+      "step": 1
+    },
+    {
+      "name": "S_level",
+      "label": "Structural drift level",
+      "type": "radio",
+      "options": [
+        { "value": "low", "label": "Low" },
+        { "value": "medium", "label": "Medium" },
+        { "value": "high", "label": "High" }
+      ]
+    },
+    {
+      "name": "S_checklist",
+      "label": "Structural drift checklist",
+      "type": "checklist",
+      "items": [
+        "Expansion of politically sensitive case categories",
+        "Increased use of emergency powers",
+        "Rise of vague statutory language",
+        "Centralization of prosecutorial authority",
+        "Judicial reassignment patterns observed"
+      ]
+    },
+    {
+      "name": "S_notes",
+      "label": "Structural notes",
+      "type": "text"
+    }
+  ]
+}
+```
+
+---
+
+# **📁 procedural.json**
+```json
+{
+  "title": "Procedural Drift",
+  "description": "Evaluates adversarial testing, defense access, procedural fairness, and courtroom integrity.",
+  "fields": [
+    {
+      "name": "P",
+      "label": "Procedural drift score",
+      "type": "slider",
+      "min": 0,
+      "max": 10,
+      "step": 1
+    },
+    {
+      "name": "P_level",
+      "label": "Procedural drift level",
+      "type": "radio",
+      "options": [
+        { "value": "low", "label": "Low" },
+        { "value": "medium", "label": "Medium" },
+        { "value": "high", "label": "High" }
+      ]
+    },
+    {
+      "name": "P_checklist",
+      "label": "Procedural drift checklist",
+      "type": "checklist",
+      "items": [
+        "Cross‑examination restricted",
+        "Defense motions routinely denied",
+        "Expert testimony limited",
+        "Sealed evidence increasing",
+        "Procedural choreography observed",
+        "Defense counsel intimidation reported"
+      ]
+    },
+    {
+      "name": "P_notes",
+      "label": "Procedural notes",
+      "type": "text"
+    }
+  ]
+}
+```
+
+---
+
+# **📁 evidence.json**
+```json
+{
+  "title": "Evidence Drift",
+  "description": "Evaluates evidence handling, admissibility, chain-of-custody integrity, and narrative-driven curation.",
+  "fields": [
+    {
+      "name": "E",
+      "label": "Evidence drift score",
+      "type": "slider",
+      "min": 0,
+      "max": 10,
+      "step": 1
+    },
+    {
+      "name": "E_level",
+      "label": "Evidence drift level",
+      "type": "radio",
+      "options": [
+        { "value": "low", "label": "Low" },
+        { "value": "medium", "label": "Medium" },
+        { "value": "high", "label": "High" }
+      ]
+    },
+    {
+      "name": "E_checklist",
+      "label": "Evidence drift checklist",
+      "type": "checklist",
+      "items": [
+        "Exculpatory evidence excluded",
+        "Chain-of-custody irregularities",
+        "Reliance on anonymous witnesses",
+        "Increase in sealed or classified evidence",
+        "Evidence curated to match narrative",
+        "Pretextual arrests observed"
+      ]
+    },
+    {
+      "name": "E_notes",
+      "label": "Evidence notes",
+      "type": "text"
+    }
+  ]
+}
+```
+
+---
+
+# **📁 outcome.json**
+```json
+{
+  "title": "Outcome Drift",
+  "description": "Evaluates verdict alignment with political needs, sentencing patterns, and narrative anchoring.",
+  "fields": [
+    {
+      "name": "O",
+      "label": "Outcome drift score",
+      "type": "slider",
+      "min": 0,
+      "max": 10,
+      "step": 1
+    },
+    {
+      "name": "O_level",
+      "label": "Outcome drift level",
+      "type": "radio",
+      "options": [
+        { "value": "low", "label": "Low" },
+        { "value": "medium", "label": "Medium" },
+        { "value": "high", "label": "High" }
+      ]
+    },
+    {
+      "name": "O_checklist",
+      "label": "Outcome drift checklist",
+      "type": "checklist",
+      "items": [
+        "Verdicts align with political narratives",
+        "Harsher sentencing for dissent-related cases",
+        "Narrative-anchored reasoning in rulings",
+        "Circular justification patterns",
+        "Decline in acquittals for sensitive cases"
+      ]
+    },
+    {
+      "name": "O_notes",
+      "label": "Outcome notes",
+      "type": "text"
+    }
+  ]
+}
+```
+
+---
+
+# **📁 oversight.json**
+```json
+{
+  "title": "Oversight Drift",
+  "description": "Evaluates appeals, transparency, watchdog independence, and corrective mechanisms.",
+  "fields": [
+    {
+      "name": "R",
+      "label": "Oversight drift score",
+      "type": "slider",
+      "min": 0,
+      "max": 10,
+      "step": 1
+    },
+    {
+      "name": "R_level",
+      "label": "Oversight drift level",
+      "type": "radio",
+      "options": [
+        { "value": "low", "label": "Low" },
+        { "value": "medium", "label": "Medium" },
+        { "value": "high", "label": "High" }
+      ]
+    },
+    {
+      "name": "R_checklist",
+      "label": "Oversight drift checklist",
+      "type": "checklist",
+      "items": [
+        "Appeals rarely succeed",
+        "Higher courts politically aligned",
+        "Delayed or obstructed reviews",
+        "Restrictions on watchdogs",
+        "Reduced transparency",
+        "External oversight constrained"
+      ]
+    },
+    {
+      "name": "R_notes",
+      "label": "Oversight notes",
+      "type": "text"
+    }
+  ]
+}
+```
+
+---
+
+# **📁 context.json**  
+(Useful for dropdowns, CSV‑backed selects, metadata)
+
+```json
+{
+  "title": "Context Metadata",
+  "description": "Captures contextual information such as region, agency, and case type.",
+  "fields": [
+    {
+      "name": "region",
+      "label": "Region",
+      "type": "select",
+      "source": "regions.csv"
+    },
+    {
+      "name": "agency",
+      "label": "Agency",
+      "type": "select",
+      "source": "agencies.csv"
+    },
+    {
+      "name": "case_type",
+      "label": "Case Type",
+      "type": "radio",
+      "options": [
+        { "value": "criminal", "label": "Criminal" },
+        { "value": "civil", "label": "Civil" },
+        { "value": "administrative", "label": "Administrative" },
+        { "value": "political", "label": "Political / Sensitive" }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+# **📁 procedural-checklist.json**  
+(Standalone checklist module)
+
+```json
+{
+  "title": "Procedural Drift Checklist",
+  "description": "Standalone checklist module for procedural drift indicators.",
+  "fields": [
+    {
+      "name": "procedural_items",
+      "label": "Select all that apply",
+      "type": "checklist",
+      "items": [
+        "Cross‑examination restricted",
+        "Defense motions denied",
+        "Sealed evidence used",
+        "Witness access limited",
+        "Procedural choreography observed"
+      ]
+    }
+  ]
+}
+```
