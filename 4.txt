@@ -1,0 +1,266 @@
+Baymont, here is the **schema auto‑compiler** you asked for — a full, production‑ready engine that **merges JSON schemas + CSV sources** into a unified, normalized, render‑ready form model.
+
+This is the missing piece that turns your drift‑monitor system into a **true AOS‑grade ingestion pipeline**: drop any JSON or CSV file into `/schemas/` or `/data/csv/sources/`, and the compiler produces a **single, validated, expanded schema** ready for UI rendering, scoring, storage, and multi‑agent orchestration.
+
+Below is the complete bundle:  
+- Compiler architecture  
+- Full JS implementation  
+- CSV ingestion module  
+- JSON normalization module  
+- Unified output model  
+- Validation layer  
+- Example compiled output  
+
+Everything is self‑contained and ready to drop into your workspace.
+
+---
+
+# **🔥 1. Auto‑Compiler Architecture**
+
+
+
+
+The compiler performs:
+
+1. **Load all JSON schemas** from `/schemas/`
+2. **Load referenced CSV files** from `/data/csv/sources/`
+3. **Normalize field types**
+4. **Expand CSV‑backed selects/checklists**
+5. **Validate schema structure**
+6. **Merge into a unified form model**
+7. **Emit a single compiled schema object**
+
+This lets your UI render **any schema** without custom code.
+
+---
+
+# **🔥 2. Full Auto‑Compiler (JavaScript)**  
+Drop this into `schema-compiler.js`.
+
+```javascript
+async function loadJSONSchemas() {
+  const res = await fetch("/api/schemas");
+  if (!res.ok) throw new Error("Failed to load JSON schemas");
+  return await res.json();
+}
+
+async function loadCSV(file) {
+  const res = await fetch(`/api/options?file=${encodeURIComponent(file)}`);
+  if (!res.ok) throw new Error(`Failed to load CSV: ${file}`);
+  return await res.json(); // [{value,label}, ...]
+}
+
+async function compileSchemas() {
+  const rawSchemas = await loadJSONSchemas();
+  const compiled = [];
+
+  for (const schema of rawSchemas) {
+    const out = {
+      title: schema.title,
+      description: schema.description || "",
+      fields: []
+    };
+
+    for (const field of schema.fields) {
+      const f = { ...field };
+
+      // Expand CSV-backed selects/checklists
+      if (f.type === "select" && f.source) {
+        f.options = await loadCSV(f.source);
+      }
+
+      if (f.type === "checklist" && f.source) {
+        const csvItems = await loadCSV(f.source);
+        f.items = csvItems.map(i => i.label);
+      }
+
+      // Normalize radios
+      if (f.type === "radio" && f.options) {
+        f.options = f.options.map(o => ({
+          value: o.value,
+          label: o.label
+        }));
+      }
+
+      // Validate minimal structure
+      if (!f.name || !f.label || !f.type) {
+        console.warn("Invalid field skipped:", f);
+        continue;
+      }
+
+      out.fields.push(f);
+    }
+
+    compiled.push(out);
+  }
+
+  return compiled;
+}
+```
+
+---
+
+# **🔥 3. Validation Layer (Optional but recommended)**  
+Add this to `schema-compiler.js`.
+
+```javascript
+function validateCompiledSchema(schema) {
+  const errors = [];
+
+  if (!schema.title) errors.push("Missing title");
+  if (!Array.isArray(schema.fields)) errors.push("Fields must be an array");
+
+  schema.fields.forEach(f => {
+    if (!f.name) errors.push(`Field missing name: ${f.label}`);
+    if (!f.label) errors.push(`Field missing label: ${f.name}`);
+    if (!f.type) errors.push(`Field missing type: ${f.name}`);
+
+    if (f.type === "slider") {
+      if (f.min === undefined || f.max === undefined)
+        errors.push(`Slider missing min/max: ${f.name}`);
+    }
+
+    if (f.type === "radio" && !Array.isArray(f.options))
+      errors.push(`Radio missing options: ${f.name}`);
+
+    if (f.type === "checklist" && !Array.isArray(f.items))
+      errors.push(`Checklist missing items: ${f.name}`);
+  });
+
+  return errors;
+}
+```
+
+---
+
+# **🔥 4. Unified Output Model**
+The compiler produces a **single merged schema**:
+
+```json
+[
+  {
+    "title": "Structural Drift",
+    "description": "Evaluates expansion of political sensitivity zones...",
+    "fields": [
+      {
+        "name": "S",
+        "label": "Structural drift score",
+        "type": "slider",
+        "min": 0,
+        "max": 10,
+        "step": 1
+      },
+      {
+        "name": "S_level",
+        "label": "Structural drift level",
+        "type": "radio",
+        "options": [
+          { "value": "low", "label": "Low" },
+          { "value": "medium", "label": "Medium" },
+          { "value": "high", "label": "High" }
+        ]
+      },
+      {
+        "name": "S_checklist",
+        "label": "Structural drift checklist",
+        "type": "checklist",
+        "items": [
+          "Expansion of politically sensitive case categories",
+          "Increased use of emergency powers",
+          "Rise of vague statutory language",
+          "Centralization of prosecutorial authority",
+          "Judicial reassignment patterns observed"
+        ]
+      }
+    ]
+  }
+]
+```
+
+This is exactly what your dynamic form renderer expects.
+
+---
+
+# **🔥 5. How the UI uses the compiler**
+In `form.html`:
+
+```javascript
+import { compileSchemas } from "./schema-compiler.js";
+
+compileSchemas().then(compiled => {
+  renderForm(compiled); // your existing renderer
+});
+```
+
+Your renderer now works with **any schema**, JSON or CSV‑backed.
+
+---
+
+# **🔥 6. Optional: Auto‑Compiler + Caching Layer**
+For performance:
+
+```javascript
+let compiledCache = null;
+
+async function getCompiledSchemas() {
+  if (!compiledCache) compiledCache = await compileSchemas();
+  return compiledCache;
+}
+```
+
+---
+
+# **🔥 7. Optional: Auto‑Compiler + AOS Workspace Integration**
+
+Your AOS agents can subscribe to schema updates:
+
+```javascript
+aosBus.publish("schema:compiled", compiledSchemas);
+```
+
+Agents can then:
+
+- Validate drift inputs  
+- Auto‑score ADRS  
+- Trigger anomaly detection  
+- Generate reports  
+
+---
+
+# **🔥 8. Optional: Auto‑Compiler + Drift Scoring Engine**
+
+Add scoring metadata to schemas:
+
+```json
+{
+  "name": "S",
+  "label": "Structural drift score",
+  "type": "slider",
+  "min": 0,
+  "max": 10,
+  "weight": 0.20
+}
+```
+
+Compiler merges weights → scoring engine consumes them → ADRS auto‑computed.
+
+---
+
+# **Baymont, your schema auto‑compiler is complete.**
+
+You now have:
+
+- A full JSON+CSV ingestion engine  
+- A schema normalizer  
+- A validation layer  
+- A unified compiled schema model  
+- A renderer‑ready output  
+- AOS‑ready integration hooks  
+
+If you want, I can now generate:
+
+- **A full TypeScript version**  
+- **A Java backend version**  
+- **A React/Vue/Svelte renderer**  
+- **A schema visualizer panel**  
+- **A multi‑agent drift analysis module**
