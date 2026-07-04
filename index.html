@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Authoritarian Drift Monitor</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    iframe { width: 100%; height: 420px; border: 1px solid #ccc; }
+    section { border: 1px solid #ccc; padding: 10px; margin-bottom: 12px; }
+    label { display: block; margin-top: 6px; }
+    .field-block { margin-bottom: 8px; }
+    #jsonPreview {
+      background: #f5f5f5;
+      padding: 10px;
+      border: 3px solid #ccc;
+      white-space: pre;
+    }
+    .band-low { border-color: #66cc66; }
+    .band-emerging { border-color: #cccc66; }
+    .band-moderate { border-color: #ff9933; }
+    .band-high { border-color: #ff6666; }
+    .band-severe { border-color: #ff0000; }
+  </style>
+</head>
+<body>
+
+<h1>Authoritarian Drift Risk Monitor</h1>
+
+<iframe src="form.html" id="inputFrame"></iframe>
+
+<h2>Last submitted JSON</h2>
+<pre id="jsonPreview">{}</pre>
+
+<h2>ADRS History</h2>
+<canvas id="adrsChart" width="600" height="200"></canvas>
+
+<h2>Dimension Trends</h2>
+<canvas id="dimChart" width="600" height="240"></canvas>
+
+<script>
+  // In-memory "storage" for demo (replace with backend calls in production)
+  const historyStore = [];
+
+  function bandClass(score) {
+    if (score <= 20) return "band-low";
+    if (score <= 40) return "band-emerging";
+    if (score <= 60) return "band-moderate";
+    if (score <= 80) return "band-high";
+    return "band-severe";
+  }
+
+  window.addEventListener("message", event => {
+    if (!event.data || event.data.type !== "ADRS_SUBMIT") return;
+    const payload = event.data.payload;
+
+    // Update preview
+    const preview = document.getElementById("jsonPreview");
+    preview.textContent = JSON.stringify(payload, null, 2);
+
+    const score = Math.round(payload.ADRS100 || 0);
+    preview.className = bandClass(score);
+
+    // Store in memory
+    historyStore.push(payload);
+
+    // Re-render charts
+    renderAdrsChart(historyStore);
+    renderDimChart(historyStore);
+  });
+
+  function renderAdrsChart(data) {
+    const canvas = document.getElementById("adrsChart");
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!data.length) return;
+
+    const maxScore = 100;
+    const stepX = data.length > 1 ? canvas.width / (data.length - 1) : canvas.width;
+
+    ctx.beginPath();
+    ctx.strokeStyle = "#3366cc";
+    ctx.lineWidth = 2;
+
+    data.forEach((d, i) => {
+      const x = i * stepX;
+      const y = canvas.height - (d.ADRS100 / maxScore) * canvas.height;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+
+    ctx.stroke();
+  }
+
+  function renderDimChart(data) {
+    const canvas = document.getElementById("dimChart");
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!data.length) return;
+
+    const maxVal = 10;
+    const stepX = data.length > 1 ? canvas.width / (data.length - 1) : canvas.width;
+
+    const series = [
+      { key: "S", color: "#3366cc" },
+      { key: "P", color: "#cc3333" },
+      { key: "E", color: "#33aa33" },
+      { key: "O", color: "#aa33aa" },
+      { key: "R", color: "#ff9933" }
+    ];
+
+    series.forEach(s => {
+      ctx.beginPath();
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = 2;
+
+      data.forEach((d, i) => {
+        const x = i * stepX;
+        const y = canvas.height - (d[s.key] / maxVal) * canvas.height;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+
+      ctx.stroke();
+    });
+  }
+</script>
+
+</body>
+</html>
+```
+
+---
+
+### `form.html`
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ADRS Dynamic Form</title>
+  <style>
+    body { font-family: sans-serif; margin: 10px; }
+    section { border: 1px solid #ccc; padding: 10px; margin-bottom: 12px; }
+    label { display: block; margin-top: 6px; }
+    .field-block { margin-bottom: 8px; }
+    #scoreBox { margin-top: 12px; padding: 8px; font-weight: bold; }
+    .band-low { background: #e6ffe6; }
+    .band-emerging { background: #fffbe6; }
+    .band-moderate { background: #ffe6b3; }
+    .band-high { background: #ffcccc; }
+    .band-severe { background: #ff9999; }
+  </style>
+</head>
+<body>
+
+<h2>Authoritarian Drift Input</h2>
+<form id="dynamicForm"></form>
+<div id="scoreBox">ADRS: n/a</div>
+<button id="submitBtn" type="button">Submit</button>
+
+<script>
+  // Embedded schemas (you can externalize to JSON later)
+  const SCHEMAS = [
+    {
+      title: "Structural Drift",
+      fields: [
+        { name: "S", label: "Structural drift score", type: "slider", min: 0, max: 10, step: 1 },
+        { name: "S_notes", label: "Structural notes", type: "text" }
+      ]
+    },
+    {
+      title: "Procedural Drift",
+      fields: [
+        { name: "P", label: "Procedural drift score", type: "slider", min: 0, max: 10, step: 1 },
+        {
+          name: "P_level",
+          label: "Procedural drift level",
+          type: "radio",
+          options: [
+            { value: "low", label: "Low" },
+            { value: "medium", label: "Medium" },
+            { value: "high", label: "High" }
+          ]
+        },
+        {
+          name: "P_checklist",
+          label: "Procedural drift checklist",
+          type: "checklist",
+          items: [
+            "Cross‑examination restricted",
+            "Defense motions denied",
+            "Sealed evidence used",
+            "Procedural choreography observed"
+          ]
+        }
+      ]
+    },
+    {
+      title: "Evidence Drift",
+      fields: [
+        { name: "E", label: "Evidence drift score", type: "slider", min: 0, max: 10, step: 1 },
+        { name: "E_notes", label: "Evidence notes", type: "text" }
+      ]
+    },
+    {
+      title: "Outcome Drift",
+      fields: [
+        { name: "O", label: "Outcome drift score", type: "slider", min: 0, max: 10, step: 1 },
+        { name: "O_notes", label: "Outcome notes", type: "text" }
+      ]
+    },
+    {
+      title: "Oversight Drift",
+      fields: [
+        { name: "R", label: "Oversight drift score", type: "slider", min: 0, max: 10, step: 1 },
+        { name: "R_notes", label: "Oversight notes", type: "text" }
+      ]
+    }
+  ];
+
+  function computeADRS(payload) {
+    const S = Number(payload.S || 0);
+    const P = Number(payload.P || 0);
+    const E = Number(payload.E || 0);
+    const O = Number(payload.O || 0);
+    const R = Number(payload.R || 0);
+    const adrs = 0.20*S + 0.20*P + 0.20*E + 0.25*O + 0.15*R;
+    payload.ADRS = adrs;
+    payload.ADRS100 = adrs * 10;
+    return payload;
+  }
+
+  function bandClass(score) {
+    if (score <= 20) return "band-low";
+    if (score <= 40) return "band-emerging";
+    if (score <= 60) return "band-moderate";
+    if (score <= 80) return "band-high";
+    return "band-severe";
+  }
+
+  function updateScoreBox(payload) {
+    const box = document.getElementById("scoreBox");
+    const s = Math.round(payload.ADRS100 || 0);
+    box.textContent = `ADRS: ${s}`;
+    box.className = bandClass(s);
+  }
+
+  function renderField(section, field) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "field-block";
+
+    const label = document.createElement("label");
+    label.textContent = field.label;
+    wrapper.appendChild(label);
+
+    let input;
+
+    switch (field.type) {
+      case "text":
+        input = document.createElement("input");
+        input.type = "text";
+        input.name = field.name;
+        break;
+      case "number":
+        input = document.createElement("input");
+        input.type = "number";
+        input.name = field.name;
+        if (field.min !== undefined) input.min = field.min;
+        if (field.max !== undefined) input.max = field.max;
+        break;
+      case "slider":
+        input = document.createElement("input");
+        input.type = "range";
+        input.name = field.name;
+        input.min = field.min;
+        input.max = field.max;
+        input.step = field.step || 1;
+        break;
+      case "radio":
+        input = document.createElement("div");
+        field.options.forEach(opt => {
+          const r = document.createElement("input");
+          r.type = "radio";
+          r.name = field.name;
+          r.value = opt.value;
+          const rl = document.createElement("span");
+          rl.textContent = opt.label;
+          const container = document.createElement("div");
+          container.appendChild(r);
+          container.appendChild(rl);
+          input.appendChild(container);
+        });
+        break;
+      case "checklist":
+        input = document.createElement("div");
+        field.items.forEach(item => {
+          const c = document.createElement("input");
+          c.type = "checkbox";
+          c.name = field.name;
+          c.value = item;
+          const cl = document.createElement("span");
+          cl.textContent = item;
+          const container = document.createElement("div");
+          container.appendChild(c);
+          container.appendChild(cl);
+          input.appendChild(container);
+        });
+        break;
+      default:
+        input = document.createElement("input");
+        input.type = "text";
+        input.name = field.name;
+    }
+
+    wrapper.appendChild(input);
+    section.appendChild(wrapper);
+  }
+
+  function collectPayload(form) {
+    const payload = {};
+    [...form.elements].forEach(el => {
+      if (!el.name) return;
+      if (el.type === "radio") {
+        if (el.checked) payload[el.name] = el.value;
+        return;
+      }
+      if (el.type === "checkbox") {
+        if (!payload[el.name]) payload[el.name] = [];
+        if (el.checked) payload[el.name].push(el.value);
+        return;
+      }
+      payload[el.name] = (el.type === "number" || el.type === "range")
+        ? Number(el.value || 0)
+        : el.value;
+    });
+    return payload;
+  }
+
+  // Render schemas
+  const form = document.getElementById("dynamicForm");
+  SCHEMAS.forEach(schema => {
+    const section = document.createElement("section");
+    const title = document.createElement("h3");
+    title.textContent = schema.title;
+    section.appendChild(title);
+    schema.fields.forEach(f => renderField(section, f));
+    form.appendChild(section);
+  });
+
+  form.addEventListener("input", () => {
+    const payload = collectPayload(form);
+    computeADRS(payload);
+    updateScoreBox(payload);
+  });
+
+  document.getElementById("submitBtn").onclick = () => {
+    const payload = collectPayload(form);
+    payload.timestamp = new Date().toISOString();
+    computeADRS(payload);
+    window.parent.postMessage({ type: "ADRS_SUBMIT", payload }, "*");
+  };
+</script>
+
+</body>
+</html>
