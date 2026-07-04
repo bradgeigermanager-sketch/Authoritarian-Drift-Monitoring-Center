@@ -1,0 +1,766 @@
+### Project structure
+
+```text
+drift-monitor/
+  src/
+    main/
+      java/
+        com/example/drift/
+          AdrsServlet.java
+          SchemaServlet.java
+          CsvOptionsServlet.java
+          HistoryServlet.java
+          HistoryFullServlet.java
+      webapp/
+        index.html
+        form.html
+        schema-loader.js
+        css/
+          styles.css
+        schemas/
+          structural.json
+          procedural.json
+          evidence.json
+          outcome.json
+          oversight.json
+          context.json
+          procedural-checklist.json
+        data/
+          json/
+            adrs-log.jsonl
+          csv/
+            adrs-log.csv
+            sources/
+              regions.csv
+              agencies.csv
+              procedural-checklist.csv
+  WEB-INF/
+    web.xml
+  pom.xml (if Maven)
+```
+
+---
+
+### `pom.xml` (Maven, Jakarta Servlet + JSON)
+
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.example</groupId>
+  <artifactId>drift-monitor</artifactId>
+  <version>1.0.0</version>
+  <packaging>war</packaging>
+
+  <dependencies>
+    <dependency>
+      <groupId>jakarta.servlet</groupId>
+      <artifactId>jakarta.servlet-api</artifactId>
+      <version>6.0.0</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.json</groupId>
+      <artifactId>json</artifactId>
+      <version>20231013</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>drift-monitor</finalName>
+  </build>
+</project>
+```
+
+---
+
+### `WEB-INF/web.xml`
+
+```xml
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+         version="6.0">
+  <display-name>Drift Monitor</display-name>
+</web-app>
+```
+
+---
+
+### Java servlets
+
+#### `AdrsServlet.java`
+
+```java
+package com.example.drift;
+
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.*;
+import org.json.JSONObject;
+
+import java.io.*;
+
+@WebServlet("/api/adrs")
+public class AdrsServlet extends HttpServlet {
+
+    private File jsonFile;
+    private File csvFile;
+
+    @Override
+    public void init() {
+        String base = getServletContext().getRealPath("/");
+        File jsonDir = new File(base, "data/json");
+        File csvDir = new File(base, "data/csv");
+        jsonDir.mkdirs();
+        csvDir.mkdirs();
+
+        jsonFile = new File(jsonDir, "adrs-log.jsonl");
+        csvFile = new File(csvDir, "adrs-log.csv");
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp)
+            throws IOException {
+
+        String body = req.getReader().lines().reduce("", (a, b) -> a + b);
+        JSONObject obj = new JSONObject(body);
+
+        try (PrintWriter pw = new PrintWriter(new FileWriter(jsonFile, true))) {
+            pw.println(obj.toString());
+        }
+
+        boolean newFile = !csvFile.exists();
+        try (PrintWriter pw = new PrintWriter(new FileWriter(csvFile, true))) {
+            if (newFile) {
+                pw.println("timestamp,S,P,E,O,R,ADRS,ADRS100");
+            }
+            pw.printf("%s,%s,%s,%s,%s,%s,%s,%s%n",
+                    obj.optString("timestamp", ""),
+                    obj.opt("S"),
+                    obj.opt("P"),
+                    obj.opt("E"),
+                    obj.opt("O"),
+                    obj.opt("R"),
+                    obj.opt("ADRS"),
+                    obj.opt("ADRS100"));
+        }
+
+        resp.setStatus(HttpServletResponse.SC_NO_CONTENT);
+    }
+}
+```
+
+#### `SchemaServlet.java`
+
+```java
+package com.example.drift;
+
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.*;
+import org.json.*;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.Arrays;
+
+@WebServlet("/api/schemas")
+public class SchemaServlet extends HttpServlet {
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+            throws IOException {
+
+        File schemaDir = new File(getServletContext().getRealPath("/schemas"));
+        JSONArray arr = new JSONArray();
+
+        File[] files = schemaDir.listFiles((d, name) -> name.endsWith(".json"));
+        if (files != null) {
+            Arrays.sort(files);
+            for (File f : files) {
+                String json = Files.readString(f.toPath());
+                JSONObject obj = new JSONObject(json);
+                if (!obj.has("title") || !obj.has("fields")) continue;
+                arr.put(obj);
+            }
+        }
+
+        resp.setContentType("application/json");
+        resp.getWriter().write(arr.toString());
+    }
+}
+```
+
+#### `CsvOptionsServlet.java`
+
+```java
+package com.example.drift;
+
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.*;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.*;
+
+@WebServlet("/api/options")
+public class CsvOptionsServlet extends HttpServlet {
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+            throws IOException {
+
+        String file = req.getParameter("file");
+        if (file == null || file.contains("..")) {
+            resp.sendError(400, "invalid file param");
+            return;
+        }
+
+        File baseDir = new File(getServletContext().getRealPath("/data/csv/sources"));
+        File csv = new File(baseDir, file);
+        if (!csv.exists()) {
+            resp.sendError(404, "options file not found");
+            return;
+        }
+
+        JSONArray arr = new JSONArray();
+        try (BufferedReader br = new BufferedReader(new FileReader(csv))) {
+            String header = br.readLine();
+            String line;
+            while ((line = br.readLine()) != null) {
+                String[] parts = line.split(",", 2);
+                if (parts.length == 2) {
+                    JSONObject o = new JSONObject();
+                    o.put("value", parts[0].trim());
+                    o.put("label", parts[1].trim());
+                    arr.put(o);
+                }
+            }
+        }
+
+        resp.setContentType("application/json");
+        resp.getWriter().write(arr.toString());
+    }
+}
+```
+
+#### `HistoryServlet.java`
+
+```java
+package com.example.drift;
+
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.*;
+import org.json.*;
+
+import java.io.*;
+
+@WebServlet("/api/history")
+public class HistoryServlet extends HttpServlet {
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+            throws IOException {
+
+        File jsonFile = new File(getServletContext().getRealPath("/data/json/adrs-log.jsonl"));
+        JSONArray arr = new JSONArray();
+
+        if (jsonFile.exists()) {
+            try (BufferedReader br = new BufferedReader(new FileReader(jsonFile))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    JSONObject obj = new JSONObject(line);
+                    JSONObject out = new JSONObject();
+                    out.put("timestamp", obj.optString("timestamp", ""));
+                    out.put("ADRS100", obj.optDouble("ADRS100", 0.0));
+                    arr.put(out);
+                }
+            }
+        }
+
+        resp.setContentType("application/json");
+        resp.getWriter().write(arr.toString());
+    }
+}
+```
+
+#### `HistoryFullServlet.java`
+
+```java
+package com.example.drift;
+
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.*;
+import org.json.*;
+
+import java.io.*;
+
+@WebServlet("/api/history-full")
+public class HistoryFullServlet extends HttpServlet {
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+            throws IOException {
+
+        File jsonFile = new File(getServletContext().getRealPath("/data/json/adrs-log.jsonl"));
+        JSONArray arr = new JSONArray();
+
+        if (jsonFile.exists()) {
+            try (BufferedReader br = new BufferedReader(new FileReader(jsonFile))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    JSONObject obj = new JSONObject(line);
+                    JSONObject out = new JSONObject();
+                    out.put("timestamp", obj.optString("timestamp", ""));
+                    out.put("S", obj.optDouble("S", 0.0));
+                    out.put("P", obj.optDouble("P", 0.0));
+                    out.put("E", obj.optDouble("E", 0.0));
+                    out.put("O", obj.optDouble("O", 0.0));
+                    out.put("R", obj.optDouble("R", 0.0));
+                    out.put("ADRS100", obj.optDouble("ADRS100", 0.0));
+                    arr.put(out);
+                }
+            }
+        }
+
+        resp.setContentType("application/json");
+        resp.getWriter().write(arr.toString());
+    }
+}
+```
+
+---
+
+### Front‑end files
+
+#### `css/styles.css`
+
+```css
+body { font-family: sans-serif; margin: 20px; }
+iframe { width: 100%; height: 420px; border: 1px solid #ccc; }
+section { border: 1px solid #ccc; padding: 10px; margin-bottom: 12px; }
+label { display: block; margin-top: 6px; }
+.field-block { margin-bottom: 8px; }
+#jsonPreview {
+  background: #f5f5f5;
+  padding: 10px;
+  border: 3px solid #ccc;
+  white-space: pre;
+}
+.band-low { border-color: #66cc66; }
+.band-emerging { border-color: #cccc66; }
+.band-moderate { border-color: #ff9933; }
+.band-high { border-color: #ff6666; }
+.band-severe { border-color: #ff0000; }
+```
+
+#### `schema-loader.js`
+
+```javascript
+let _schemasCache = null;
+
+async function loadSchemas(url = "/api/schemas") {
+  if (_schemasCache) return _schemasCache;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Failed to load schemas");
+  _schemasCache = await res.json();
+  return _schemasCache;
+}
+```
+
+#### `form.html`
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>ADRS Dynamic Form</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="schema-loader.js"></script>
+</head>
+<body>
+
+<h2>Authoritarian Drift Input</h2>
+<form id="dynamicForm"></form>
+<div id="scoreBox">ADRS: n/a</div>
+<button id="submitBtn" type="button">Submit</button>
+
+<script>
+  function computeADRS(payload) {
+    const S = Number(payload.S || 0);
+    const P = Number(payload.P || 0);
+    const E = Number(payload.E || 0);
+    const O = Number(payload.O || 0);
+    const R = Number(payload.R || 0);
+    const adrs = 0.20*S + 0.20*P + 0.20*E + 0.25*O + 0.15*R;
+    payload.ADRS = adrs;
+    payload.ADRS100 = adrs * 10;
+    return payload;
+  }
+  function bandClass(score) {
+    if (score <= 20) return "band-low";
+    if (score <= 40) return "band-emerging";
+    if (score <= 60) return "band-moderate";
+    if (score <= 80) return "band-high";
+    return "band-severe";
+  }
+  function updateScoreBox(payload) {
+    const box = document.getElementById("scoreBox");
+    const s = Math.round(payload.ADRS100 || 0);
+    box.textContent = `ADRS: ${s}`;
+    box.className = bandClass(s);
+  }
+
+  function renderField(section, field) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "field-block";
+
+    const label = document.createElement("label");
+    label.textContent = field.label;
+    wrapper.appendChild(label);
+
+    let input;
+
+    switch (field.type) {
+      case "text":
+        input = document.createElement("input");
+        input.type = "text";
+        input.name = field.name;
+        break;
+      case "number":
+        input = document.createElement("input");
+        input.type = "number";
+        input.name = field.name;
+        if (field.min !== undefined) input.min = field.min;
+        if (field.max !== undefined) input.max = field.max;
+        break;
+      case "slider":
+        input = document.createElement("input");
+        input.type = "range";
+        input.name = field.name;
+        input.min = field.min;
+        input.max = field.max;
+        input.step = field.step || 1;
+        break;
+      case "radio":
+        input = document.createElement("div");
+        field.options.forEach(opt => {
+          const r = document.createElement("input");
+          r.type = "radio";
+          r.name = field.name;
+          r.value = opt.value;
+          const rl = document.createElement("span");
+          rl.textContent = opt.label;
+          const container = document.createElement("div");
+          container.appendChild(r);
+          container.appendChild(rl);
+          input.appendChild(container);
+        });
+        break;
+      case "select":
+        input = document.createElement("select");
+        input.name = field.name;
+        if (field.source) {
+          fetch(`/api/options?file=${encodeURIComponent(field.source)}`)
+            .then(r => r.json())
+            .then(options => {
+              options.forEach(opt => {
+                const o = document.createElement("option");
+                o.value = opt.value;
+                o.textContent = opt.label;
+                input.appendChild(o);
+              });
+            });
+        }
+        break;
+      case "checklist":
+        input = document.createElement("div");
+        field.items.forEach(item => {
+          const c = document.createElement("input");
+          c.type = "checkbox";
+          c.name = field.name;
+          c.value = item;
+          const cl = document.createElement("span");
+          cl.textContent = item;
+          const container = document.createElement("div");
+          container.appendChild(c);
+          container.appendChild(cl);
+          input.appendChild(container);
+        });
+        break;
+      default:
+        input = document.createElement("input");
+        input.type = "text";
+        input.name = field.name;
+    }
+
+    wrapper.appendChild(input);
+    section.appendChild(wrapper);
+  }
+
+  function collectPayload(form) {
+    const payload = {};
+    [...form.elements].forEach(el => {
+      if (!el.name) return;
+      if (el.type === "radio") {
+        if (el.checked) payload[el.name] = el.value;
+        return;
+      }
+      if (el.type === "checkbox") {
+        if (!payload[el.name]) payload[el.name] = [];
+        if (el.checked) payload[el.name].push(el.value);
+        return;
+      }
+      payload[el.name] = (el.type === "number" || el.type === "range")
+        ? Number(el.value || 0)
+        : el.value;
+    });
+    return payload;
+  }
+
+  loadSchemas().then(schemas => {
+    const form = document.getElementById("dynamicForm");
+    schemas.forEach(schema => {
+      const section = document.createElement("section");
+      const title = document.createElement("h3");
+      title.textContent = schema.title;
+      section.appendChild(title);
+      schema.fields.forEach(f => renderField(section, f));
+      form.appendChild(section);
+    });
+
+    form.addEventListener("input", () => {
+      const payload = collectPayload(form);
+      computeADRS(payload);
+      updateScoreBox(payload);
+    });
+  });
+
+  document.getElementById("submitBtn").onclick = () => {
+    const form = document.getElementById("dynamicForm");
+    const payload = collectPayload(form);
+    payload.timestamp = new Date().toISOString();
+    computeADRS(payload);
+    window.parent.postMessage({ type: "ADRS_SUBMIT", payload }, "*");
+  };
+</script>
+
+</body>
+</html>
+```
+
+#### `index.html`
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Authoritarian Drift Monitor</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<h1>Authoritarian Drift Risk Monitor</h1>
+
+<iframe src="form.html" id="inputFrame"></iframe>
+
+<h2>Last submitted JSON</h2>
+<pre id="jsonPreview">{}</pre>
+
+<h2>ADRS History</h2>
+<canvas id="adrsChart" width="600" height="200"></canvas>
+
+<h2>Dimension Trends</h2>
+<canvas id="dimChart" width="600" height="240"></canvas>
+
+<script>
+  function bandClass(score) {
+    if (score <= 20) return "band-low";
+    if (score <= 40) return "band-emerging";
+    if (score <= 60) return "band-moderate";
+    if (score <= 80) return "band-high";
+    return "band-severe";
+  }
+
+  window.addEventListener("message", event => {
+    if (!event.data || event.data.type !== "ADRS_SUBMIT") return;
+    const payload = event.data.payload;
+
+    const preview = document.getElementById("jsonPreview");
+    preview.textContent = JSON.stringify(payload, null, 2);
+
+    const score = Math.round(payload.ADRS100 || 0);
+    preview.className = bandClass(score);
+
+    fetch("api/adrs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).then(() => {
+      loadHistory().then(renderChart);
+      loadFullHistory().then(renderDimChart);
+    });
+  });
+
+  async function loadHistory() {
+    const res = await fetch("api/history");
+    if (!res.ok) return [];
+    return await res.json();
+  }
+
+  async function loadFullHistory() {
+    const res = await fetch("api/history-full");
+    if (!res.ok) return [];
+    return await res.json();
+  }
+
+  function renderChart(data) {
+    const canvas = document.getElementById("adrsChart");
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!data.length) return;
+
+    const maxScore = 100;
+    const stepX = data.length > 1 ? canvas.width / (data.length - 1) : canvas.width;
+
+    ctx.beginPath();
+    ctx.strokeStyle = "#3366cc";
+    ctx.lineWidth = 2;
+
+    data.forEach((d, i) => {
+      const x = i * stepX;
+      const y = canvas.height - (d.ADRS100 / maxScore) * canvas.height;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+
+    ctx.stroke();
+  }
+
+  function renderDimChart(data) {
+    const canvas = document.getElementById("dimChart");
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!data.length) return;
+
+    const maxVal = 10;
+    const stepX = data.length > 1 ? canvas.width / (data.length - 1) : canvas.width;
+
+    const series = [
+      { key: "S", color: "#3366cc" },
+      { key: "P", color: "#cc3333" },
+      { key: "E", color: "#33aa33" },
+      { key: "O", color: "#aa33aa" },
+      { key: "R", color: "#ff9933" }
+    ];
+
+    series.forEach(s => {
+      ctx.beginPath();
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = 2;
+
+      data.forEach((d, i) => {
+        const x = i * stepX;
+        const y = canvas.height - (d[s.key] / maxVal) * canvas.height;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+
+      ctx.stroke();
+    });
+  }
+
+  loadHistory().then(renderChart);
+  loadFullHistory().then(renderDimChart);
+</script>
+
+</body>
+</html>
+```
+
+---
+
+### Example schemas
+
+#### `structural.json`
+
+```json
+{
+  "title": "Structural Drift",
+  "fields": [
+    { "name": "S", "label": "Structural drift score", "type": "slider", "min": 0, "max": 10, "step": 1 },
+    { "name": "S_notes", "label": "Structural notes", "type": "text" }
+  ]
+}
+```
+
+#### `procedural.json`
+
+```json
+{
+  "title": "Procedural Drift",
+  "fields": [
+    { "name": "P", "label": "Procedural drift score", "type": "slider", "min": 0, "max": 10, "step": 1 },
+    {
+      "name": "P_level",
+      "label": "Procedural drift level",
+      "type": "radio",
+      "options": [
+        { "value": "low", "label": "Low" },
+        { "value": "medium", "label": "Medium" },
+        { "value": "high", "label": "High" }
+      ]
+    },
+    {
+      "name": "P_checklist",
+      "label": "Procedural drift checklist",
+      "type": "checklist",
+      "items": [
+        "Cross‑examination restricted",
+        "Defense motions denied",
+        "Sealed evidence used",
+        "Procedural choreography observed"
+      ]
+    }
+  ]
+}
+```
+
+#### `evidence.json`
+
+```json
+{
+  "title": "Evidence Drift",
+  "fields": [
+    { "name": "E", "label": "Evidence drift score", "type": "slider", "min": 0, "max": 10, "step": 1 },
+    { "name": "E_notes", "label": "Evidence notes", "type": "text" }
+  ]
+}
+```
+
+#### `outcome.json`
+
+```json
+{
+  "title": "Outcome Drift",
+  "fields": [
+    { "name": "O", "label": "Outcome drift score", "type": "slider", "min": 0, "max": 10, "step": 1 },
+    { "name": "O_notes", "label": "Outcome notes", "type": "text" }
+  ]
+}
+```
+
+#### `oversight.json`
+
+```json
+{
+  "title": "Oversight Drift",
+  "fields": [
+    { "name": "R", "label": "Oversight drift score", "type": "slider", "min": 0, "max": 10, "step": 1 },
+    { "name": "R_notes", "label": "Oversight notes", "type": "text" }
+  ]
+}
+```
+
+---
+
+This package is ready to drop into a servlet container (Tomcat/Jetty) and mount as `/drift-monitor`.
