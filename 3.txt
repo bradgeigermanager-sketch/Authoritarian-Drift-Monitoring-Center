@@ -1,0 +1,202 @@
+Baymont, here is the **full CSV template set**, fully aligned with the JSON schemas you already have.  
+These CSVs are plug‑and‑play: drop them into your `/data/csv/sources/` directory and your dynamic form engine will auto‑generate dropdowns, checklists, and contextual selectors.
+
+Each CSV is clean, normalized, and ready for ingestion.
+
+---
+
+# **📁 regions.csv**
+(Used by `context.json` → select field)
+
+```csv
+value,label
+north_region,North Region
+south_region,South Region
+east_region,East Region
+west_region,West Region
+central_region,Central Region
+```
+
+---
+
+# **📁 agencies.csv**
+(Used by `context.json` → select field)
+
+```csv
+value,label
+LEA01,Law Enforcement Agency 01
+LEA02,Law Enforcement Agency 02
+LEA03,Law Enforcement Agency 03
+LEA04,Law Enforcement Agency 04
+LEA05,Law Enforcement Agency 05
+```
+
+---
+
+# **📁 procedural-checklist.csv**
+(Alternative to procedural-checklist.json)
+
+```csv
+item
+Cross‑examination restricted
+Defense motions denied
+Sealed evidence used
+Witness access limited
+Procedural choreography observed
+Defense counsel intimidation reported
+```
+
+---
+
+# **📁 structural-checklist.csv**
+(Used by `structural.json`)
+
+```csv
+item
+Expansion of politically sensitive case categories
+Increased use of emergency powers
+Rise of vague statutory language
+Centralization of prosecutorial authority
+Judicial reassignment patterns observed
+```
+
+---
+
+# **📁 evidence-checklist.csv**
+(Used by `evidence.json`)
+
+```csv
+item
+Exculpatory evidence excluded
+Chain-of-custody irregularities
+Reliance on anonymous witnesses
+Increase in sealed or classified evidence
+Evidence curated to match narrative
+Pretextual arrests observed
+```
+
+---
+
+# **📁 outcome-checklist.csv**
+(Used by `outcome.json`)
+
+```csv
+item
+Verdicts align with political narratives
+Harsher sentencing for dissent-related cases
+Narrative-anchored reasoning in rulings
+Circular justification patterns
+Decline in acquittals for sensitive cases
+```
+
+---
+
+# **📁 oversight-checklist.csv**
+(Used by `oversight.json`)
+
+```csv
+item
+Appeals rarely succeed
+Higher courts politically aligned
+Delayed or obstructed reviews
+Restrictions on watchdogs
+Reduced transparency
+External oversight constrained
+```
+
+---
+
+# **📁 case-types.csv**
+(Optional — for expanded context metadata)
+
+```csv
+value,label
+criminal,Criminal Case
+civil,Civil Case
+administrative,Administrative Case
+political_sensitive,Political / Sensitive Case
+regulatory,Regulatory Enforcement Case
+```
+
+---
+
+# **📁 drift-levels.csv**
+(Optional — universal drift-level selector)
+
+```csv
+value,label
+low,Low Drift
+medium,Medium Drift
+high,High Drift
+critical,Critical Drift
+```
+
+---
+
+# **📁 severity-scale.csv**
+(Optional — for sliders or numeric scoring)
+
+```csv
+value,label
+0,None
+2,Minimal
+4,Moderate
+6,Significant
+8,Severe
+10,Extreme
+```
+
+---
+
+# **📁 metadata-tags.csv**
+(Optional — tag system for advanced analytics)
+
+```csv
+value,label
+sensitive_case,Sensitive Case
+high_risk,High Risk
+requires_review,Requires Review
+flag_for_followup,Flag for Follow-Up
+external_watchdog,External Watchdog Involved
+```
+
+---
+
+# **📁 drift-indicators.csv**
+(Optional — global checklist for all dimensions)
+
+```csv
+item
+Political sensitivity expansion
+Restricted adversarial testing
+Evidence curation
+Outcome alignment with narratives
+Oversight collapse
+Appeal success decline
+Vague statute proliferation
+Defense counsel pressure
+Procedural choreography
+Narrative enforcement
+```
+
+---
+
+# **Baymont, your full CSV template suite is complete.**
+
+You now have:
+
+- **Context selectors** (regions, agencies, case types)  
+- **Checklist modules** for every drift dimension  
+- **Universal drift-level scales**  
+- **Severity scales**  
+- **Metadata tags**  
+- **Global drift indicator list**
+
+All of these integrate seamlessly with your JSON schemas and dynamic form engine.
+
+If you want, I can now generate:
+
+- A **master merged schema** (JSON + CSV compiled into one UI model)  
+- A **schema validator**  
+- A **schema auto‑compiler** that builds forms from mixed JSON/CSV sources  
+- A **full AOS workspace module** wrapping all of this into a single panel
